@@ -421,6 +421,7 @@ h1{
 .bgm input{width:84px;accent-color:#d9b25a}
 .bgm button:focus-visible,.bgm input:focus-visible{outline:3px solid #fff3c4;outline-offset:2px}
 @media (max-width:520px){.bgm input{width:60px}}
+.bgm{flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 28px)}
 </style>
 </head>
 <body>
@@ -2790,6 +2791,7 @@ renderRoster();renderShop();loadForm(null);
 
 <div class="bgm" role="group" aria-label="Music and display">
   <button type="button" id="bgm-btn" aria-pressed="true">Music on</button>
+  <button type="button" id="sfx-btn" aria-pressed="true">Sound on</button>
   <button type="button" id="fs-btn" hidden>Fullscreen</button>
   <input type="range" id="bgm-vol" min="0" max="100" step="5" value="35" aria-label="Music volume">
 </div>
@@ -2819,6 +2821,35 @@ const sync=()=>{b.textContent=cur()?'Exit fullscreen':'Fullscreen'};
 b.hidden=false;
 b.onclick=()=>{try{const p=cur()?ex.call(d):req.call(r);if(p&&p.catch)p.catch(()=>{})}catch(e){}};
 d.addEventListener('fullscreenchange',sync);d.addEventListener('webkitfullscreenchange',sync);
+})();
+</script>
+<script>
+(()=>{
+const ld=k=>{try{return localStorage.getItem(k)}catch(e){return null}},sv=(k,x)=>{try{localStorage.setItem(k,x)}catch(e){}};
+let C,N,on=ld('cpc-sfx')!=='0';const B=document.getElementById('sfx-btn');
+const sync=()=>{B.textContent=on?'Sound on':'Sound off';B.setAttribute('aria-pressed',on)};sync();
+const ctx=()=>{if(!C){const A=window.AudioContext||window.webkitAudioContext;if(!A)return;C=new A();const l=C.sampleRate*.2|0;N=C.createBuffer(1,l,C.sampleRate);const d=N.getChannelData(0);for(let i=0;i<l;i++)d[i]=Math.random()*2-1}if(C.state=='suspended')C.resume();return C};
+const env=(g,t,a,d,v)=>{g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d)};
+const tone=(ty,f0,f1,d,v,t0=0)=>{const t=C.currentTime+t0,o=C.createOscillator(),g=C.createGain();o.type=ty;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f1,t+d);env(g,t,.004,d,v);o.connect(g).connect(C.destination);o.start(t);o.stop(t+d+.03)};
+const nz=(f0,f1,d,v,q,ty)=>{const t=C.currentTime,s=C.createBufferSource(),f=C.createBiquadFilter(),g=C.createGain();s.buffer=N;f.type=ty||'bandpass';f.Q.value=q;f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(f1,t+d);env(g,t,.003,d,v);s.connect(f).connect(g).connect(C.destination);s.start(t);s.stop(t+d+.03)};
+const j=()=>1+(Math.random()-.5)*.16;
+const S={
+ thock(){const k=j();tone('triangle',200*k,80*k,.09,.5);nz(900,300,.04,.25,.8,'lowpass')},
+ tap(){const k=j();tone('triangle',620*k,330*k,.05,.22);nz(2500,1200,.02,.18,1)},
+ card(){nz(3200,1100,.11,.3,1.2);tone('sine',140,90,.05,.15)},
+ good(){[523,659,784,1047].forEach((f,i)=>tone('triangle',f,f,.28,.2,i*.1))},
+ bad(){tone('sawtooth',130,70,.28,.12);nz(400,200,.2,.1,.7,'lowpass')}
+};
+const play=n=>{if(on&&ctx())S[n]()};
+B.onclick=()=>{on=!on;sv('cpc-sfx',on?'1':'0');sync();play('thock')};
+document.addEventListener('pointerdown',e=>{if(e.target===B)return;const t=e.target.closest&&e.target.closest('.pc,button,[role=button],.cell,.bc,[class*=tile],[class*=piece]');if(!t||t.disabled)return;
+  const c=t.getAttribute('class')||'';play(/(^|\s)pc(\s|$)/.test(c)?'card':/(^|\s)(cell|bc)(\s|$)|tile|piece/.test(c)?'tap':'thock')},true);
+document.addEventListener('keydown',e=>{if(e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;
+  if(t.matches&&t.matches('input:not([type=range]):not([type=checkbox]),textarea')&&(e.key.length==1||e.key=='Backspace'))play('tap')},true);
+const seen=new WeakMap(),GOOD=/solved|complete|you win|you wins|blackjack!|congrat|cleared|well done|perfect/i,BAD=/wrong|bust|you lose|dealer wins|out of chips|incorrect|not quite|try again|game over/i;
+new MutationObserver(ms=>{for(const m of ms){const n=m.target.nodeType==3?m.target.parentElement:m.target,l=n&&n.closest&&n.closest('[aria-live]');if(!l)continue;
+  const x=l.textContent.trim();if(!x||seen.get(l)===x)continue;seen.set(l,x);play(GOOD.test(x)?'good':BAD.test(x)?'bad':l.id=='cg-msg'?'card':'tap');return}
+}).observe(document.body,{subtree:true,childList:true,characterData:true});
 })();
 </script>
 </body>
